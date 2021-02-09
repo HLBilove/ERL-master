@@ -1,6 +1,6 @@
 import os
 import torch
-from akt import AKT
+from erl_akt import ERL_AKT
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -10,7 +10,6 @@ def try_makedirs(path_):
             os.makedirs(path_)
         except FileExistsError:
             pass
-
 
 def get_file_name_identifier(params):
     words = params.model.split('_')
@@ -43,7 +42,7 @@ def load_model(params):
     model_type = words[0]
 
     if model_type in {'akt'}:
-        model = AKT(n_question=params.n_question, n_pid=params.n_pid, n_tid=params.n_tid, n_fid=params.n_fid,
+        model = ERL_AKT(n_question=params.n_question, n_pid=params.n_pid, n_tid=params.n_tid, n_fid=params.n_fid,
                     n_sd=params.n_sd, n_rd=params.n_rd, n_xid=params.n_xid, n_yid=params.n_yid,
                     n_blocks=params.n_block, d_model=params.d_model, dropout=params.dropout, kq_same=params.kq_same,
                     model_type=model_type, l2=params.l2).to(device)
