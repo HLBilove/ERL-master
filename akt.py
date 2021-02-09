@@ -20,13 +20,7 @@ class AKT(nn.Module):
     def __init__(self, n_question, n_pid, n_tid, n_fid, n_sd, n_rd, n_xid, n_yid, d_model, n_blocks,
                  kq_same, dropout, model_type, final_fc_dim=512, n_heads=8, d_ff=2048,  l2=1e-5, separate_qa=False):
         super().__init__()
-        """
-        Input:
-            d_model: dimension of attention block
-            final_fc_dim: dimension of final fully connected net before prediction
-            n_heads: number of heads in multi-headed attention
-            d_ff : dimension for fully conntected net inside the basic block
-        """
+
         self.n_question = n_question
         self.dropout = dropout
         self.kq_same = kq_same
@@ -133,26 +127,26 @@ class AKT(nn.Module):
 
         c_reg_loss = 0.
         if self.n_pid > 10000:
-            q_embed_diff_data = self.q_embed_diff(q_data)  # d_ct
-            pid_embed_data = self.difficult_param(pid_data)  # uq
-            r_embed_x += pid_embed_data * q_embed_diff_data  # uq *d_ct + c_ct
-            qa_embed_diff_data = self.qa_embed_diff(a_data)  # f_(ct,rt) or #h_rt
+            q_embed_diff_data = self.q_embed_diff(q_data)
+            pid_embed_data = self.difficult_param(pid_data)
+            r_embed_x += pid_embed_data * q_embed_diff_data
+            qa_embed_diff_data = self.qa_embed_diff(a_data)
             if self.separate_qa:
                 r_embed_y += pid_embed_data * qa_embed_diff_data
             else:
                 r_embed_y += pid_embed_data * (qa_embed_diff_data+q_embed_diff_data)
         else:
-            q_embed_diff_data = self.q_embed_diff(pid_data)  # d_ct
+            q_embed_diff_data = self.q_embed_diff(pid_data)
             qa_embed_diff_data = self.qa_embed_diff(a_data)+q_embed_diff_data
             r_embed_x = torch.cat([r_embed_x, q_embed_diff_data], dim=-1)
             r_embed_y = torch.cat([r_embed_y, qa_embed_diff_data], dim=-1)
         if self.n_tid > 0:
-            t_embed_data = self.t_embed(t_data)  # uq
+            t_embed_data = self.t_embed(t_data)
             ta_embed_data = self.ta_embed(a_data)+t_embed_data
             p_embed_x = t_embed_data
             p_embed_y = ta_embed_data
         if self.n_fid > 0:
-            f_embed_data = self.f_embed(f_data)  # uq
+            f_embed_data = self.f_embed(f_data)
             fa_embed_data = self.fa_embed(a_data)+f_embed_data
             p_embed_x = f_embed_data
             p_embed_y = fa_embed_data
@@ -161,12 +155,12 @@ class AKT(nn.Module):
             p_embed_y = torch.cat([ta_embed_data, fa_embed_data], dim=-1)
 
         if self.n_sd > 0:
-            sd_embed_data = self.sd_embed(sd_data)  # uq
+            sd_embed_data = self.sd_embed(sd_data)
             sda_embed_data = self.sda_embed(a_data)+sd_embed_data
             f_embed_x = sd_embed_data
             f_embed_y = sda_embed_data
         if self.n_rd > 0:
-            rd_embed_data = self.rd_embed(rd_data)  # uq
+            rd_embed_data = self.rd_embed(rd_data)
             rda_embed_data = self.rda_embed(a_data)+rd_embed_data
             f_embed_x = rd_embed_data
             f_embed_y = rda_embed_data
@@ -175,12 +169,12 @@ class AKT(nn.Module):
             f_embed_y = torch.cat([sda_embed_data, rda_embed_data], dim=-1)
 
         if self.n_o1id > 0:
-            o1_embed_data = self.o1_embed(o1_data)  # uq
+            o1_embed_data = self.o1_embed(o1_data)
             o1a_embed_data = self.o1a_embed(a_data)+o1_embed_data
             o_embed_x = o1_embed_data
             o_embed_y = o1a_embed_data
         if self.n_o2id > 0:
-            o2_embed_data = self.o2_embed(o2_data)  # uq
+            o2_embed_data = self.o2_embed(o2_data)
             o2a_embed_data = self.o2a_embed(a_data)+o2_embed_data
             o_embed_x = o2_embed_data
             o_embed_y = o2a_embed_data
@@ -200,18 +194,15 @@ class AKT(nn.Module):
             concat_embed_x = torch.cat([concat_embed_x, o_embed_x], dim=-1)
             concat_embed_y = torch.cat([concat_embed_y, o_embed_y], dim=-1)
 
-        # BS.seqlen,d_model
-        # Pass to the decoder
-        # output shape BS,seqlen,d_model or d_model//2
         x_embed = self.x_press(concat_embed_x)
         y_embed = self.x_press(concat_embed_y)
 
-        d_output = self.model(x_embed, y_embed)  # 211x512
+        d_output = self.model(x_embed, y_embed)
         concat_q = torch.cat([d_output, x_embed], dim=-1)
         output = self.out(concat_q)
         labels = target.reshape(-1)
         m = nn.Sigmoid()
-        preds = (output.reshape(-1))  # logit
+        preds = (output.reshape(-1))
         mask = labels > -0.9
         masked_labels = labels[mask].float()
         masked_preds = preds[mask]
@@ -224,12 +215,6 @@ class Architecture(nn.Module):
     def __init__(self, n_question,  n_blocks, d_model, d_feature,
                  d_ff, n_heads, dropout, kq_same, model_type):
         super().__init__()
-        """
-            n_block : number of stacked blocks in the attention
-            d_model : dimension of attention input/output
-            d_feature : dimension of input in each of the multi-head attention part.
-            n_head : number of heads. n_heads*d_feature = d_model
-        """
         self.d_model = d_model
         self.model_type = model_type
 
@@ -246,7 +231,6 @@ class Architecture(nn.Module):
             ])
 
     def forward(self, q_embed_data, qa_embed_data):
-        # target shape  bs, seqlen
         seqlen, batch_size = q_embed_data.size(1), q_embed_data.size(0)
 
         qa_pos_embed = qa_embed_data
@@ -261,11 +245,11 @@ class Architecture(nn.Module):
             y = block(mask=1, query=y, key=y, values=y)
         flag_first = True
         for block in self.blocks_2:
-            if flag_first:  # peek current question
+            if flag_first:
                 x = block(mask=1, query=x, key=x,
                           values=x, apply_pos=False)
                 flag_first = False
-            else:  # dont peek current response
+            else:
                 x = block(mask=0, query=x, key=x, values=y, apply_pos=True)
                 flag_first = True
         return x
@@ -295,19 +279,6 @@ class TransformerLayer(nn.Module):
         self.dropout2 = nn.Dropout(dropout)
 
     def forward(self, mask, query, key, values, apply_pos=True):
-        """
-        Input:
-            block : object of type BasicBlock(nn.Module). It contains masked_attn_head objects which is of type MultiHeadAttention(nn.Module).
-            mask : 0 means, it can peek only past values. 1 means, block can peek only current and pas values
-            query : Query. In transformer paper it is the input for both encoder and decoder
-            key : Keys. In transformer paper it is the input for both encoder and decoder
-            Values. In transformer paper it is the input for encoder and  encoded output for decoder (in masked attention part)
-
-        Output:
-            query: Input gets changed over the layer and returned.
-
-        """
-
         seqlen, batch_size = query.size(1), query.size(0)
         nopeek_mask = np.triu(
             np.ones((1, 1, seqlen, seqlen)), k=mask).astype('uint8')
@@ -400,11 +371,8 @@ class MultiHeadAttention(nn.Module):
 
 
 def attention(q, k, v, d_k, mask, dropout, zero_pad, gamma=None):
-    """
-    This is called by Multi-head atention object to find the values.
-    """
     scores = torch.matmul(q, k.transpose(-2, -1)) / \
-        math.sqrt(d_k)  # BS, 8, seqlen, seqlen
+        math.sqrt(d_k)
     bs, head, seqlen = scores.size(0), scores.size(1), scores.size(2)
 
     x1 = torch.arange(seqlen).expand(seqlen, -1).to(device)
