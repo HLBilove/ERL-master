@@ -40,12 +40,12 @@ python mai.py --dataset assist2017 --model akt_e_p
 
 (BE+PE+FE)
 ```
-python main.py --dataset assist2007 --model akt_e_p_f
+python main.py --dataset assist2017 --model akt_e_p_f
 python mai.py --dataset statics --model akt_e_p_f
 ```
 
 (ERL)
 ```
-python main.py --dataset assist2007 --model akt_e_p_f_a
+python main.py --dataset assist2017 --model akt_e_p_f_a
 python mai.py --dataset statics --model akt_e_p_f_a
 ```
