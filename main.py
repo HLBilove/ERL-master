@@ -9,6 +9,7 @@ import torch
 from load_data import DATA
 from run import train, test
 from utils import try_makedirs, load_model, get_file_name_identifier
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def train_one_dataset(params, file_name, train_data, valid_data):
     # ================================== model initialization ==================================
@@ -139,12 +140,13 @@ def get_auc(fold_num):
     parser.add_argument('--kq_same', type=int, default=1)
 
     # AKT-R Specific Parameter
-    parser.add_argument('--l2', type=float,default=1e-5, help='l2 penalty for difficulty')
+    parser.add_argument('--l2', type=float, default=1e-5, help='l2 penalty for difficulty')
 
     # Datasets and Model
-    parser.add_argument('--model', type=str, default='akt_pid',
+    parser.add_argument('--model', type=str, default='akt',
                         help="combination of akt(mandatory), e_p_f_a (mandatory) separated by underscore '_'.")
     parser.add_argument('--dataset', type=str, default="assist2009")
+    parser.add_argument('--test', type=bool, default=False, help='enable testing')
 
     params = parser.parse_args()
     dataset = params.dataset
@@ -155,11 +157,11 @@ def get_auc(fold_num):
         params.seqlen = 400
         params.data_dir = 'data/'+dataset
         params.data_name = dataset
-        params.n_pid = 26688
+        params.n_pid = 19932
         params.n_tid = 8
         params.n_fid = 8
-        params.n_sd = 0 #sequence_delay
-        params.n_rd = 0 #repeat_delay
+        params.n_sd = 14 #sequence_delay
+        params.n_rd = 11 #repeat_delay
         params.n_xid = 816
         params.n_yid = 4
 
@@ -169,7 +171,7 @@ def get_auc(fold_num):
         params.data_dir = 'data/'+dataset
         params.data_name = dataset
         params.n_question = 102
-        params.n_pid = 3162
+        params.n_pid = 0#3162
         params.n_tid = 4
         params.n_fid = 7
         params.n_sd = 18 #sequence_delay
@@ -200,8 +202,8 @@ def get_auc(fold_num):
         params.n_pid = 56030
         params.n_tid = 7
         params.n_fid = 5
-        params.n_sd = 17
-        params.n_rd = 18
+        params.n_sd = 14
+        params.n_rd = 15
         params.n_xid = 21
         params.n_yid = 0#56030
 
@@ -230,21 +232,21 @@ def get_auc(fold_num):
         file_name = file_name+item_[0] + str(item_[1])
 
     train_data_path = params.data_dir + "/" + \
-        params.data_name + "_train"+str(params.train_set)+".csv"
+                          params.data_name + "_train"+str(params.train_set)+".csv"
     valid_data_path = params.data_dir + "/" + \
-        params.data_name + "_valid"+str(params.train_set)+".csv"
+                          params.data_name + "_valid"+str(params.train_set)+".csv"
 
     train_data = dat.load_data(train_data_path)
     valid_data = dat.load_data(valid_data_path)
     # Train and get the best episode
     best_epoch = train_one_dataset(
-        params, file_name, train_data, valid_data)
+            params, file_name, train_data, valid_data)
     test_data_path = params.data_dir + "/" + \
-        params.data_name + "_test"+str(params.train_set)+".csv"
-    test_data = dat.load_test_data(
-        test_data_path)
+                         params.data_name + "_test"+str(params.train_set)+".csv"
+    test_data = dat.load_test_data(test_data_path)
     auc, acc, loss = test_one_dataset(params, file_name, test_data, best_epoch)
     return test_data[-1], auc, acc, loss
+
 
 if __name__ == '__main__':
     weight_auc = 0
