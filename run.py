@@ -42,18 +42,18 @@ def train(net, params, optimizer, data, label):
     xid_data = data[7]
     yid_data = data[8]
 
-    e_flag, p_flag, f_flag, a_flag, model_type = model_id_type(params.model)
-    if not e_flag:
-        params.n_pid = 0
-    if not p_flag:
-        params.n_tid = 0
-        params.n_fid = 0
-    if not f_flag:
-        params.n_sd = 0
-        params.n_rd = 0
-    if not f_flag:
-        params.n_xid = 0
-        params.n_yid = 0
+    # e_flag, p_flag, f_flag, a_flag, model_type = model_id_type(params.model)
+    # if not e_flag:
+    #     params.n_pid = 0
+    # if not p_flag:
+    #     params.n_tid = 0
+    #     params.n_fid = 0
+    # if not f_flag:
+    #     params.n_sd = 0
+    #     params.n_rd = 0
+    # if not a_flag:
+    #     params.n_xid = 0
+    #     params.n_yid = 0
 
     N = int(math.ceil(len(q_data) / params.batch_size))
     q_data = q_data.T
@@ -96,7 +96,8 @@ def train(net, params, optimizer, data, label):
         yid_one_seq = yid_data[:, idx * params.batch_size:(idx + 1) * params.batch_size]
 
         qa_one_seq = qa_data[:, idx * params.batch_size:(idx+1) * params.batch_size]
-        if model_type in transpose_data_model:
+
+        if params.n_pid > 0 :
             input_q = np.transpose(q_one_seq[:, :])  # Shape (bs, seqlen)
             input_qa = np.transpose(qa_one_seq[:, :])  # Shape (bs, seqlen)
             target = np.transpose(qa_one_seq[:, :])
@@ -118,6 +119,7 @@ def train(net, params, optimizer, data, label):
             input_rd = (rd_one_seq[:, :])
             input_xid = (xid_one_seq[:, :])
             input_yid = (yid_one_seq[:, :])
+
         target = (target - 1) / params.n_question
         target_1 = np.floor(target)
         el = np.sum(target_1 >= -.9)
@@ -180,18 +182,18 @@ def test(net, params, optimizer, data, label):
     xid_data = data[7]
     yid_data = data[8]
 
-    e_flag, p_flag, f_flag, a_flag, model_type = model_id_type(params.model)
-    if not e_flag:
-        params.n_pid = 0
-    if not p_flag:
-        params.n_tid = 0
-        params.n_fid = 0
-    if not f_flag:
-        params.n_sd = 0
-        params.n_rd = 0
-    if not f_flag:
-        params.n_xid = 0
-        params.n_yid = 0
+    # e_flag, p_flag, f_flag, a_flag, model_type = model_id_type(params.model)
+    # if not e_flag:
+    #     params.n_pid = 0
+    # if not p_flag:
+    #     params.n_tid = 0
+    #     params.n_fid = 0
+    # if not f_flag:
+    #     params.n_sd = 0
+    #     params.n_rd = 0
+    # if not a_flag:
+    #     params.n_xid = 0
+    #     params.n_yid = 0
     net.eval()
 
     N = int(math.ceil(float(len(q_data)) / float(params.batch_size)))
@@ -209,6 +211,9 @@ def test(net, params, optimizer, data, label):
     pred_list = []
     target_list = []
 
+    input_s_list = []#
+    input_e_list = []#
+
     count = 0
     true_el = 0
     element_count = 0
@@ -224,7 +229,7 @@ def test(net, params, optimizer, data, label):
 
         qa_one_seq = qa_data[:, idx * params.batch_size:(idx+1) * params.batch_size]
 
-        if model_type in transpose_data_model:
+        if params.n_pid > 0:
             input_q = np.transpose(q_one_seq[:, :])
             input_qa = np.transpose(qa_one_seq[:, :])
             target = np.transpose(qa_one_seq[:, :])
@@ -276,15 +281,26 @@ def test(net, params, optimizer, data, label):
         nopadding_index = nopadding_index.tolist()
         pred_nopadding = pred[nopadding_index]
         target_nopadding = target[nopadding_index]
-
         element_count += pred_nopadding.shape[0]
         pred_list.append(pred_nopadding)
         target_list.append(target_nopadding)
 
-    assert count == seq_num, "Seq not matching"
+        ######
+        input_s = input_q.reshape((-1,))
+        input_s_nopadding = input_s[nopadding_index]
+        input_s_nopadding_array = input_s_nopadding.cpu().numpy()
+        input_s_list.append(input_s_nopadding_array)
 
+        input_e = input_pid.reshape((-1,))
+        input_e_nopadding = input_e[nopadding_index]
+        input_e_nopadding_array = input_e_nopadding.cpu().numpy()
+        input_e_list.append(input_e_nopadding_array)
+
+
+    assert count == seq_num, "Seq not matching"
     all_pred = np.concatenate(pred_list, axis=0)
     all_target = np.concatenate(target_list, axis=0)
+
     loss = binaryEntropy(all_target, all_pred)
     auc = compute_auc(all_target, all_pred)
     acc = compute_accuracy(all_target, all_pred)
