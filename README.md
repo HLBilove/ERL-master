@@ -1,4 +1,4 @@
-# ERL
+# ERL+AKT
 
 ## Setups
 The requiring environment is as bellow:  
