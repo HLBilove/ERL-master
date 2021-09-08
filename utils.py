@@ -34,8 +34,8 @@ def model_id_type(model_name):
     is_e = True if 'e' in words else False
     is_p = True if 'p' in words else False
     is_f = True if 'f' in words else False
-    is_s = True if 's' in words else False
-    return is_e, is_p, is_f, is_s, words[0]
+    is_a = True if 'a' in words else False
+    return is_e, is_p, is_f, is_a, words[0]
 
 def load_model(params):
     words = params.model.split('_')
