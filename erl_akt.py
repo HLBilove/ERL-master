@@ -36,14 +36,16 @@ class ERL_AKT(nn.Module):
         embed_l = d_model
         concat_embed_l = embed_l
 
-        if self.n_pid > 10000:
+        if self.n_pid > 10000000:
             self.difficult_param = nn.Embedding(self.n_pid + 1, 1)
             self.q_embed_diff = nn.Embedding(self.n_question+1, embed_l)
             self.qa_embed_diff = nn.Embedding(2 * self.n_question + 1, embed_l)
-        else:
+        elif self.n_pid > 0:
             self.q_embed_diff = nn.Embedding(self.n_pid+1, embed_l)
             self.qa_embed_diff = nn.Embedding(2, embed_l)
-            concat_embed_l += embed_l
+            self.x_b_press = nn.Sequential(nn.Linear(embed_l*2, embed_l), nn.Tanh(), nn.Dropout(self.dropout))
+            self.y_b_press = nn.Sequential(nn.Linear(embed_l*2, embed_l), nn.Tanh(), nn.Dropout(self.dropout))
+
         if self.n_tid > 0:
             self.t_embed = nn.Embedding(self.n_tid + 1, embed_l)
             self.ta_embed = nn.Embedding(2, embed_l)
@@ -52,6 +54,14 @@ class ERL_AKT(nn.Module):
             self.f_embed = nn.Embedding(self.n_fid + 1, embed_l)
             self.fa_embed = nn.Embedding(2, embed_l)
             concat_embed_l += embed_l
+        if self.n_tid > 0 and self.n_fid > 0:
+            concat_embed_l -= embed_l
+            self.x_p_press = nn.Sequential(nn.Linear(embed_l*2, embed_l), nn.Tanh(), nn.Dropout(self.dropout))
+            self.y_p_press = nn.Sequential(nn.Linear(embed_l*2, embed_l), nn.Tanh(), nn.Dropout(self.dropout))
+        else:
+            self.x_p_press = nn.Sequential(nn.Linear(embed_l, embed_l), nn.Tanh(), nn.Dropout(self.dropout))
+            self.y_p_press = nn.Sequential(nn.Linear(embed_l, embed_l), nn.Tanh(), nn.Dropout(self.dropout))
+
         if self.n_sd > 0:
             self.sd_embed = nn.Embedding(self.n_sd + 1, embed_l)
             self.sda_embed = nn.Embedding(2, embed_l)
@@ -60,6 +70,14 @@ class ERL_AKT(nn.Module):
             self.rd_embed = nn.Embedding(self.n_rd + 1, embed_l)
             self.rda_embed = nn.Embedding(2, embed_l)
             concat_embed_l += embed_l
+        if self.n_sd > 0 and self.n_rd > 0:
+            concat_embed_l -= embed_l
+            self.x_f_press = nn.Sequential(nn.Linear(embed_l*2, embed_l), nn.Tanh(), nn.Dropout(self.dropout))
+            self.y_f_press = nn.Sequential(nn.Linear(embed_l*2, embed_l), nn.Tanh(), nn.Dropout(self.dropout))
+        else:
+            self.x_f_press = nn.Sequential(nn.Linear(embed_l, embed_l), nn.Tanh(), nn.Dropout(self.dropout))
+            self.y_f_press = nn.Sequential(nn.Linear(embed_l, embed_l), nn.Tanh(), nn.Dropout(self.dropout))
+
         if self.n_o1id > 0:
             self.o1_embed = nn.Embedding(self.n_o1id + 1, embed_l)
             self.o1a_embed = nn.Embedding(2, embed_l)
@@ -68,6 +86,13 @@ class ERL_AKT(nn.Module):
             self.o2_embed = nn.Embedding(self.n_o2id + 1, embed_l)
             self.o2a_embed = nn.Embedding(2, embed_l)
             concat_embed_l += embed_l
+        if self.n_o1id > 0 and self.n_o2id > 0:
+            concat_embed_l -= embed_l
+            self.x_a_press = nn.Sequential(nn.Linear(embed_l*2, embed_l), nn.Tanh(), nn.Dropout(self.dropout))
+            self.y_a_press = nn.Sequential(nn.Linear(embed_l*2, embed_l), nn.Tanh(), nn.Dropout(self.dropout))
+        else:
+            self.x_a_press = nn.Sequential(nn.Linear(embed_l, embed_l), nn.Tanh(), nn.Dropout(self.dropout))
+            self.y_a_press = nn.Sequential(nn.Linear(embed_l, embed_l), nn.Tanh(), nn.Dropout(self.dropout))
 
         # n_question+1 ,d_model
         self.q_embed = nn.Embedding(self.n_question+1, embed_l)
@@ -76,15 +101,19 @@ class ERL_AKT(nn.Module):
         else:
             self.qa_embed = nn.Embedding(2, embed_l)
 
+        # self.x_press = nn.Sequential(nn.Linear(concat_embed_l, d_model), nn.Sigmoid(), nn.Dropout(self.dropout))
+        # self.y_press = nn.Sequential(nn.Linear(concat_embed_l, d_model), nn.Sigmoid(), nn.Dropout(self.dropout))
+
         self.x_press = nn.Sequential(nn.Linear(concat_embed_l, d_model), nn.Softplus(), nn.Dropout(self.dropout))
         self.y_press = nn.Sequential(nn.Linear(concat_embed_l, d_model), nn.Softplus(), nn.Dropout(self.dropout))
+
         # Architecture Object. It contains stack of attention block
         self.model = Architecture(n_question=n_question, n_blocks=n_blocks, n_heads=n_heads, dropout=dropout,
                                     d_model=d_model, d_feature=d_model / n_heads, d_ff=d_ff,
                                 kq_same=self.kq_same, model_type=self.model_type)
 
         self.out = nn.Sequential(
-            nn.Linear(d_model + embed_l,
+            nn.Linear(d_model + d_model,
                       final_fc_dim), nn.ReLU(), nn.Dropout(self.dropout),
             nn.Linear(final_fc_dim, 256), nn.ReLU(
             ), nn.Dropout(self.dropout),
@@ -125,7 +154,7 @@ class ERL_AKT(nn.Module):
         r_embed_y = qa_embed_data
 
         c_reg_loss = 0.
-        if self.n_pid > 10000:
+        if self.n_pid > 10000000:
             q_embed_diff_data = self.q_embed_diff(q_data)
             pid_embed_data = self.difficult_param(pid_data)
             r_embed_x += pid_embed_data * q_embed_diff_data
@@ -134,11 +163,15 @@ class ERL_AKT(nn.Module):
                 r_embed_y += pid_embed_data * qa_embed_diff_data
             else:
                 r_embed_y += pid_embed_data * (qa_embed_diff_data+q_embed_diff_data)
-        else:
+            c_reg_loss = (pid_embed_data ** 2.).sum() * self.l2
+        elif self.n_pid > 0:
             q_embed_diff_data = self.q_embed_diff(pid_data)
             qa_embed_diff_data = self.qa_embed_diff(a_data)+q_embed_diff_data
             r_embed_x = torch.cat([r_embed_x, q_embed_diff_data], dim=-1)
             r_embed_y = torch.cat([r_embed_y, qa_embed_diff_data], dim=-1)
+            r_embed_x = self.x_b_press(r_embed_x)
+            r_embed_y = self.y_b_press(r_embed_y)
+
         if self.n_tid > 0:
             t_embed_data = self.t_embed(t_data)
             ta_embed_data = self.ta_embed(a_data)+t_embed_data
@@ -152,6 +185,9 @@ class ERL_AKT(nn.Module):
         if self.n_tid > 0 and self.n_fid > 0:
             p_embed_x = torch.cat([t_embed_data, f_embed_data], dim=-1)
             p_embed_y = torch.cat([ta_embed_data, fa_embed_data], dim=-1)
+        if self.n_tid > 0 or self.n_fid > 0:
+            p_embed_x = self.x_p_press(p_embed_x)
+            p_embed_y = self.y_p_press(p_embed_y)
 
         if self.n_sd > 0:
             sd_embed_data = self.sd_embed(sd_data)
@@ -166,6 +202,9 @@ class ERL_AKT(nn.Module):
         if self.n_sd > 0 and self.n_rd > 0:
             f_embed_x = torch.cat([sd_embed_data, rd_embed_data], dim=-1)
             f_embed_y = torch.cat([sda_embed_data, rda_embed_data], dim=-1)
+        if self.n_sd > 0 or self.n_rd > 0:
+            f_embed_x = self.x_f_press(f_embed_x)
+            f_embed_y = self.y_f_press(f_embed_y)
 
         if self.n_o1id > 0:
             o1_embed_data = self.o1_embed(o1_data)
@@ -180,6 +219,9 @@ class ERL_AKT(nn.Module):
         if self.n_o1id > 0 and self.n_o2id > 0:
             o_embed_x = torch.cat([o1_embed_data, o2_embed_data], dim=-1)
             o_embed_y = torch.cat([o1a_embed_data, o2a_embed_data], dim=-1)
+        if self.n_o1id > 0 or self.n_o2id > 0:
+            o_embed_x = self.x_a_press(o_embed_x)
+            o_embed_y = self.y_a_press(o_embed_y)
 
         concat_embed_x = r_embed_x
         concat_embed_y = r_embed_y
@@ -394,11 +436,17 @@ def attention(q, k, v, d_k, mask, dropout, zero_pad, gamma=None):
             (disttotal_scores-distcum_scores)*position_effect, min=0.)
         dist_scores = dist_scores.sqrt().detach()
     m = nn.Softplus()
+
     gamma = -1. * m(gamma).unsqueeze(0)  # 1,8,1,1
     # Now after do exp(gamma*distance) and then clamp to 1e-5 to 1e5
-    total_effect = torch.clamp(torch.clamp(
-        (dist_scores*gamma).exp(), min=1e-5), max=1e5)
+    total_effect = torch.clamp(torch.clamp((dist_scores*gamma).exp(), min=1e-5), max=1e5)
     scores = scores * total_effect
+
+    # gamma = -1. * m(gamma).unsqueeze(0)  # 1,8,1,1
+    # # Now after do exp(gamma*distance) and then clamp to 1e-5 to 1e5
+    # total_effect = torch.clamp(torch.clamp(
+    #     (dist_scores*gamma).exp(), min=1e-5), max=1e5)
+    # scores = scores * total_effect
 
     scores.masked_fill_(mask == 0, -1e32)
     scores = F.softmax(scores, dim=-1)  # BS,8,seqlen,seqlen
